@@ -1,7 +1,7 @@
 package = "base64mix"
 version = "1.0.0-1"
 source = {
-    url = "git://github.com/mah0x211/lua-base64mix.git",
+    url = "git+https://github.com/mah0x211/lua-base64mix.git",
     tag = 'v1.0.0'
 }
 description = {
