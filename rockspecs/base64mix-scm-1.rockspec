@@ -1,7 +1,7 @@
 package = "base64mix"
 version = "scm-1"
 source = {
-    url = "git://github.com/mah0x211/lua-base64mix.git",
+    url = "git+https://github.com/mah0x211/lua-base64mix.git",
 }
 description = {
     summary = "base64 encode/decode module",
