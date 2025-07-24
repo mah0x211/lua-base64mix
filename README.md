@@ -14,6 +14,10 @@ base64 encode/decode module.
 luarocks install base64mix
 ```
 
+## Error Handling
+
+the following functions return an `error` object created by https://github.com/mah0x211/lua-errno module.
+
 
 ## str, err = base64mix.encode( src:string )
 

@@ -27,20 +27,15 @@
  */
 
 #include "base64mix.h"
-#include <ctype.h>
-#include <errno.h>
+#include "lua_errno.h"
 #include <lauxlib.h>
 #include <lua.h>
+// include system headers
+#include <ctype.h>
+#include <errno.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-
-#define lstate_fn2tbl(L, k, v)                                                 \
-    do {                                                                       \
-        lua_pushstring(L, k);                                                  \
-        lua_pushcfunction(L, v);                                               \
-        lua_rawset(L, -3);                                                     \
-    } while (0)
 
 #define encode_lua(L, fn)                                                      \
     do {                                                                       \
@@ -53,7 +48,7 @@
             return 1;                                                          \
         }                                                                      \
         lua_pushnil(L);                                                        \
-        lua_pushstring(L, strerror(errno));                                    \
+        lua_errno_new(L, errno, "base64.encode");                              \
         return 2;                                                              \
     } while (0)
 
@@ -78,7 +73,7 @@ static int encode_url_lua(lua_State *L)
             return 1;                                                          \
         }                                                                      \
         lua_pushnil(L);                                                        \
-        lua_pushstring(L, strerror(errno));                                    \
+        lua_errno_new(L, errno, "base64.decode");                              \
         return 2;                                                              \
     } while (0)
 
@@ -99,12 +94,23 @@ static int decode_mix_lua(lua_State *L)
 
 LUALIB_API int luaopen_base64mix(lua_State *L)
 {
+    // Load errno library for error handling
+    lua_errno_loadlib(L);
+    // Export Base64 functions
     lua_createtable(L, 0, 5);
-    lstate_fn2tbl(L, "encode", encode_std_lua);
-    lstate_fn2tbl(L, "decode", decode_std_lua);
-    lstate_fn2tbl(L, "encodeURL", encode_url_lua);
-    lstate_fn2tbl(L, "decodeURL", decode_url_lua);
-    lstate_fn2tbl(L, "decodeMix", decode_mix_lua);
+    // standard Base64 encoding/decoding
+    lua_pushcfunction(L, encode_std_lua);
+    lua_setfield(L, -2, "encode");
+    lua_pushcfunction(L, decode_std_lua);
+    lua_setfield(L, -2, "decode");
+    // URL-safe Base64 encoding/decoding
+    lua_pushcfunction(L, encode_url_lua);
+    lua_setfield(L, -2, "encodeURL");
+    lua_pushcfunction(L, decode_url_lua);
+    lua_setfield(L, -2, "decodeURL");
+    // mixed Base64 decoding
+    lua_pushcfunction(L, decode_mix_lua);
+    lua_setfield(L, -2, "decodeMix");
 
     return 1;
 }
