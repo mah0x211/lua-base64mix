@@ -37,14 +37,61 @@
 #include <stdlib.h>
 #include <string.h>
 
+#if LUA_VERSION_NUM >= 502
+
+typedef struct {
+    lua_State *L;
+    luaL_Buffer b;
+} buffer_t;
+
+static inline void pushresultsize(buffer_t *buf, size_t len)
+{
+    luaL_pushresultsize(&buf->b, len);
+}
+
+static inline char *prepbuffer(lua_State *L, buffer_t *buf, size_t len)
+{
+    return luaL_buffinitsize(L, &buf->b, len);
+}
+
+#else
+
+typedef struct {
+    lua_State *L;
+    char *b;
+    size_t sz;
+} buffer_t;
+
+static inline void pushresultsize(buffer_t *buf, size_t len)
+{
+    lua_pushlstring(buf->L, buf->b, len);
+}
+
+static inline char *prepbuffer(lua_State *L, buffer_t *buf, size_t len)
+{
+    buf->L  = L;
+    buf->b  = lua_newuserdata(L, len);
+    buf->sz = len;
+    return buf->b;
+}
+
+#endif
+
 #define encode_lua(L, fn)                                                      \
     do {                                                                       \
         size_t len      = 0;                                                   \
-        const char *str = luaL_checklstring(L, 1, &len);                       \
-        char *b64       = fn((unsigned char *)str, &len);                      \
-        if (b64) {                                                             \
-            lua_pushlstring(L, b64, len);                                      \
-            free((void *)b64);                                                 \
+        const char *src = luaL_checklstring(L, 1, &len);                       \
+        if (len == 0) {                                                        \
+            lua_pushliteral(L, ""); /* empty string */                         \
+            return 1;                                                          \
+        }                                                                      \
+        buffer_t buf  = {0};                                                   \
+        size_t dstlen = b64m_encoded_len(len) + 1;                             \
+        char *dst     = prepbuffer(L, &buf, dstlen);                           \
+        errno         = 0; /* clear errno before calling encoding function */  \
+        dstlen        = fn(src, len, dst, dstlen);                             \
+        if (dstlen != SIZE_MAX) {                                              \
+            pushresultsize(&buf, dstlen);                                      \
             return 1;                                                          \
         }                                                                      \
         lua_pushnil(L);                                                        \
@@ -54,22 +101,30 @@
 
 static int encode_std_lua(lua_State *L)
 {
-    encode_lua(L, b64m_encode_std);
+    encode_lua(L, b64m_encode_to_buffer_std);
 }
 
 static int encode_url_lua(lua_State *L)
 {
-    encode_lua(L, b64m_encode_url);
+    encode_lua(L, b64m_encode_to_buffer_url);
 }
 
 #define decode_lua(L, fn)                                                      \
     do {                                                                       \
         size_t len      = 0;                                                   \
-        const char *b64 = luaL_checklstring(L, 1, &len);                       \
-        char *str       = fn((unsigned char *)b64, &len);                      \
-        if (str) {                                                             \
-            lua_pushlstring(L, str, len);                                      \
-            free((void *)str);                                                 \
+        const char *src = luaL_checklstring(L, 1, &len);                       \
+        if (len == 0) {                                                        \
+            lua_pushliteral(L, ""); /* empty string */                         \
+            return 1;                                                          \
+        }                                                                      \
+        /* prepare buffer for decoding */                                      \
+        buffer_t buf  = {0};                                                   \
+        size_t dstlen = b64m_decoded_len(len) + 1;                             \
+        char *dst     = prepbuffer(L, &buf, dstlen);                           \
+        errno         = 0; /* clear errno before calling decoding function */  \
+        dstlen        = fn(src, len, dst, dstlen);                             \
+        if (dstlen != SIZE_MAX) {                                              \
+            pushresultsize(&buf, dstlen);                                      \
             return 1;                                                          \
         }                                                                      \
         lua_pushnil(L);                                                        \
@@ -79,17 +134,17 @@ static int encode_url_lua(lua_State *L)
 
 static int decode_std_lua(lua_State *L)
 {
-    decode_lua(L, b64m_decode_std);
+    decode_lua(L, b64m_decode_to_buffer_std);
 }
 
 static int decode_url_lua(lua_State *L)
 {
-    decode_lua(L, b64m_decode_url);
+    decode_lua(L, b64m_decode_to_buffer_url);
 }
 
 static int decode_mix_lua(lua_State *L)
 {
-    decode_lua(L, b64m_decode_mix);
+    decode_lua(L, b64m_decode_to_buffer_mix);
 }
 
 LUALIB_API int luaopen_base64mix(lua_State *L)
