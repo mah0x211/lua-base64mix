@@ -26,16 +26,12 @@
  *
  */
 
+// project
 #include "base64mix.h"
+// depend
 #include "lua_errno.h"
+// lua
 #include <lauxlib.h>
-#include <lua.h>
-// include system headers
-#include <ctype.h>
-#include <errno.h>
-#include <stdint.h>
-#include <stdlib.h>
-#include <string.h>
 
 #if LUA_VERSION_NUM >= 502
 
